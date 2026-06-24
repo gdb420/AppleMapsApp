@@ -1,0 +1,25 @@
+# Xcode user-specific state
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
+*.xcscheme
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods / SPM
+Pods/
+.swiftpm/
+build/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
