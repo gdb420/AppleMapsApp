@@ -20,6 +20,9 @@ targets:
     platform: iOS
     sources:
       - path: AppleMapsApp
+      - path: AppleMapsApp/Models/Shiba.usdz
+        buildPhase: resources
+        type: file
     info:
       path: AppleMapsApp/Info.plist
       properties:

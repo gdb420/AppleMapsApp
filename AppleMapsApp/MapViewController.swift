@@ -1,6 +1,7 @@
 import UIKit
 import MapKit
 import CoreLocation
+import SceneKit
 
 /// Apple Maps view controller with full pan / zoom / rotate / pitch gestures,
 /// map-type switching, the user's current location, long-press pin drops, and
@@ -36,6 +37,20 @@ final class MapViewController: UIViewController {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.addTarget(self, action: #selector(recenterOnUser), for: .touchUpInside)
         button.accessibilityLabel = "Recenter on my location"
+        return button
+    }()
+
+    /// Floating button that drops the 3D Shiba USDZ at the map's center.
+    private lazy var place3DButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.image = UIImage(systemName: "pawprint.fill")
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = .systemBrown
+        config.baseForegroundColor = .white
+        let button = UIButton(configuration: config, primaryAction: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: #selector(place3DObjectAtCenter), for: .touchUpInside)
+        button.accessibilityLabel = "Place 3D Shiba at map center"
         return button
     }()
 
@@ -135,6 +150,17 @@ final class MapViewController: UIViewController {
         // Use -flyToNYC 2 for a non-3D version (pitch=0) at the same location
         // for an apples-to-apples comparison.
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("-place3D") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                guard let self = self else { return }
+                let center = self.mapView.centerCoordinate
+                let anno = Object3DAnnotation(modelName: "Shiba")
+                anno.coordinate = center
+                anno.subtitle = self.format(coordinate: center)
+                self.mapView.addAnnotation(anno)
+                self.showInfo("3D Shiba placed via launch arg at \(self.format(coordinate: center))")
+            }
+        }
         if let idx = args.firstIndex(of: "-flyToNYC"), idx + 1 < args.count {
             let mode = args[idx + 1]
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -217,6 +243,7 @@ final class MapViewController: UIViewController {
 
         view.addSubview(mapTypeControl)
         view.addSubview(recenterButton)
+        view.addSubview(place3DButton)
         view.addSubview(cameraReadoutLabel)
         view.addSubview(infoLabel)
         view.addSubview(toolbar)
@@ -231,6 +258,11 @@ final class MapViewController: UIViewController {
             recenterButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
             recenterButton.widthAnchor.constraint(equalToConstant: 50),
             recenterButton.heightAnchor.constraint(equalToConstant: 50),
+
+            place3DButton.bottomAnchor.constraint(equalTo: recenterButton.topAnchor, constant: -12),
+            place3DButton.trailingAnchor.constraint(equalTo: recenterButton.trailingAnchor),
+            place3DButton.widthAnchor.constraint(equalToConstant: 50),
+            place3DButton.heightAnchor.constraint(equalToConstant: 50),
 
             cameraReadoutLabel.topAnchor.constraint(equalTo: mapTypeControl.bottomAnchor, constant: 8),
             cameraReadoutLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -491,6 +523,34 @@ final class MapViewController: UIViewController {
 
     // MARK: - Existing actions
 
+    // MARK: - 3D Object placement
+
+    /// Distinguishes a 3D-object annotation from a regular dropped pin so
+    /// the `viewFor annotation:` delegate can pick the right view class.
+    final class Object3DAnnotation: MKPointAnnotation {
+        var modelName: String
+        init(modelName: String) {
+            self.modelName = modelName
+            super.init()
+            self.title = "3D \(modelName)"
+        }
+    }
+
+    @objc private func place3DObjectAtCenter() {
+        let center = mapView.centerCoordinate
+        let anno = Object3DAnnotation(modelName: "Shiba")
+        anno.coordinate = center
+        anno.subtitle = format(coordinate: center)
+        mapView.addAnnotation(anno)
+        showInfo("3D Shiba placed at \(format(coordinate: center)) — drag to move.")
+    }
+
+    @objc private func removeAll3DObjects() {
+        let toRemove = mapView.annotations.filter { $0 is Object3DAnnotation }
+        mapView.removeAnnotations(toRemove)
+        showInfo("All 3D objects removed.")
+    }
+
     @objc private func mapTypeChanged() {
         // The Flyover map types (satelliteFlyover / hybridFlyover) require a
         // pitched camera to render the 3D photogrammetry models - they look
@@ -743,7 +803,23 @@ final class MapViewController: UIViewController {
 
 extension MapViewController: MKMapViewDelegate {
     func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
-        guard !(annotation is MKUserLocation) else { return nil }
+        // The blue user-location dot is rendered by MapKit itself.
+        if annotation is MKUserLocation { return nil }
+
+        if annotation is Object3DAnnotation {
+            let id = "3DObject"
+            let view: SceneKit3DAnnotationView
+            if let dequeued = mapView.dequeueReusableAnnotationView(withIdentifier: id) as? SceneKit3DAnnotationView {
+                dequeued.annotation = annotation
+                view = dequeued
+            } else {
+                view = SceneKit3DAnnotationView(annotation: annotation, reuseIdentifier: id)
+            }
+            view.setMapView(mapView)
+            return view
+        }
+
+        // Regular dropped pins keep the existing red marker style.
         let identifier = "droppedPin"
         let view: MKMarkerAnnotationView
         if let dequeued = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView {
@@ -758,8 +834,15 @@ extension MapViewController: MKMapViewDelegate {
         return view
     }
 
+    /// Whenever the visible region changes (pan, zoom, rotate), every 3D
+    /// annotation view needs to be re-anchored to its new screen point, and
+    /// the camera readout label needs to refresh.
     func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
         updateCameraReadout()
+        for anno in mapView.annotations {
+            guard let v = mapView.view(for: anno) as? SceneKit3DAnnotationView else { continue }
+            v.updatePosition()
+        }
     }
 }
 

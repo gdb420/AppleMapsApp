@@ -8,18 +8,22 @@
 
 /* Begin PBXBuildFile section */
 		45886AC8BED058E78F781AA5 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4A05BF68963865B47F680D /* AppDelegate.swift */; };
+		77B3E34AAE14E3541F2DCE0E /* Shiba.usdz in Resources */ = {isa = PBXBuildFile; fileRef = 31F7D661606F731CBE4B23B2 /* Shiba.usdz */; };
 		79DC48B41E0CA2825941D658 /* MapViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A3D04720354CA01C883A07 /* MapViewController.swift */; };
 		E44FD11067B47FD418631BBB /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC53A9AA10EFD9DB4AA67785 /* SceneDelegate.swift */; };
+		ECA7F4AE0716484A4A434DBE /* SceneKit3DAnnotationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD9C0045311BE3F40938A462 /* SceneKit3DAnnotationView.swift */; };
 		FD590C0FB3A97122260F7A04 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 229408E713466549511A549B /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		229408E713466549511A549B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2977E9BE1E02FF94331D11F0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		31F7D661606F731CBE4B23B2 /* Shiba.usdz */ = {isa = PBXFileReference; lastKnownFileType = file.usdz; path = Shiba.usdz; sourceTree = "<group>"; };
 		56A3D04720354CA01C883A07 /* MapViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapViewController.swift; sourceTree = "<group>"; };
 		6EFED674969206EADABB9D66 /* AppleMapsApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AppleMapsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B4A05BF68963865B47F680D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AC53A9AA10EFD9DB4AA67785 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		AD9C0045311BE3F40938A462 /* SceneKit3DAnnotationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneKit3DAnnotationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -39,8 +43,18 @@
 				2977E9BE1E02FF94331D11F0 /* Info.plist */,
 				56A3D04720354CA01C883A07 /* MapViewController.swift */,
 				AC53A9AA10EFD9DB4AA67785 /* SceneDelegate.swift */,
+				AD9C0045311BE3F40938A462 /* SceneKit3DAnnotationView.swift */,
+				C24529940B58704178AFAB78 /* Models */,
 			);
 			path = AppleMapsApp;
+			sourceTree = "<group>";
+		};
+		C24529940B58704178AFAB78 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				31F7D661606F731CBE4B23B2 /* Shiba.usdz */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		ED283919017A6E718AEC923E = {
@@ -112,6 +126,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FD590C0FB3A97122260F7A04 /* Assets.xcassets in Resources */,
+				77B3E34AAE14E3541F2DCE0E /* Shiba.usdz in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +140,7 @@
 				45886AC8BED058E78F781AA5 /* AppDelegate.swift in Sources */,
 				79DC48B41E0CA2825941D658 /* MapViewController.swift in Sources */,
 				E44FD11067B47FD418631BBB /* SceneDelegate.swift in Sources */,
+				ECA7F4AE0716484A4A434DBE /* SceneKit3DAnnotationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
