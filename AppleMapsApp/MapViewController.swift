@@ -13,11 +13,16 @@ final class MapViewController: UIViewController {
     private let locationManager = CLLocationManager()
 
     private let mapTypeControl: UISegmentedControl = {
-        let items = ["Standard", "Hybrid", "Satellite"]
+        // The last two items are the Flyover variants which render Apple's
+        // textured photogrammetry 3D models (real 3D buildings, trees,
+        // bridges, terrain) instead of the flat extruded rooftops that the
+        // regular satellite/hybrid modes show.
+        let items = ["Std", "Sat", "Hyb", "Sat 3D", "Hyb 3D"]
         let control = UISegmentedControl(items: items)
         control.selectedSegmentIndex = 0
         control.translatesAutoresizingMaskIntoConstraints = false
         control.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.85)
+        control.apportionsSegmentWidthsByContent = true
         return control
     }()
 
@@ -236,7 +241,7 @@ final class MapViewController: UIViewController {
             toolbar.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
             toolbar.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
             toolbar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
-            toolbar.heightAnchor.constraint(equalToConstant: 72),
+            toolbar.heightAnchor.constraint(equalToConstant: 88),
 
             infoLabel.bottomAnchor.constraint(equalTo: toolbar.topAnchor, constant: -12),
             infoLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -293,24 +298,38 @@ final class MapViewController: UIViewController {
         let sep1 = makeSeparator()
         let sep2 = makeSeparator()
         let sep3 = makeSeparator()
+        let sep4 = makeSeparator()
 
         // Group labels.
         let zoomLabel = makeGroupLabel("Zoom")
         let rotateLabel = makeGroupLabel("Rotate")
-        let pitchLabel = makeGroupLabel("3D")
+        let tiltLabel = makeGroupLabel("Tilt")
+        let flyLabel = makeGroupLabel("Fly")
 
-        // The rotate/pitch column gets two stacked elements (label + control).
         let rotateStack = UIStackView(arrangedSubviews: [rotateLabel, rotateButton])
         rotateStack.translatesAutoresizingMaskIntoConstraints = false
         rotateStack.axis = .vertical
         rotateStack.alignment = .center
         rotateStack.spacing = 2
 
-        let pitchStack = UIStackView(arrangedSubviews: [pitchLabel, pitchSlider])
-        pitchStack.translatesAutoresizingMaskIntoConstraints = false
-        pitchStack.axis = .vertical
-        pitchStack.alignment = .fill
-        pitchStack.spacing = 4
+        // ----- Tilt column: 5 discrete tilt preset buttons + the existing slider -----
+        let tiltTopDown = makeTiltPresetButton(title: "Top",   systemImage: "square",        action: #selector(tiltTopDown))
+        let tilt25Btn   = makeTiltPresetButton(title: "25°",   systemImage: nil,             action: #selector(tilt25))
+        let tilt45Btn   = makeTiltPresetButton(title: "45°",   systemImage: nil,             action: #selector(tilt45))
+        let tilt60Btn   = makeTiltPresetButton(title: "60°",   systemImage: nil,             action: #selector(tilt60))
+        let tiltStreetBtn = makeTiltPresetButton(title: "St",  systemImage: "figure.walk",    action: #selector(tiltStreet))
+        let tiltButtonRow = UIStackView(arrangedSubviews: [tiltTopDown, tilt25Btn, tilt45Btn, tilt60Btn, tiltStreetBtn])
+        tiltButtonRow.translatesAutoresizingMaskIntoConstraints = false
+        tiltButtonRow.axis = .horizontal
+        tiltButtonRow.alignment = .center
+        tiltButtonRow.distribution = .fillEqually
+        tiltButtonRow.spacing = 3
+
+        let tiltStack = UIStackView(arrangedSubviews: [tiltLabel, tiltButtonRow])
+        tiltStack.translatesAutoresizingMaskIntoConstraints = false
+        tiltStack.axis = .vertical
+        tiltStack.alignment = .fill
+        tiltStack.spacing = 4
 
         let zoomStack = UIStackView(arrangedSubviews: [zoomLabel, makeZoomRow()])
         zoomStack.translatesAutoresizingMaskIntoConstraints = false
@@ -318,8 +337,30 @@ final class MapViewController: UIViewController {
         zoomStack.alignment = .center
         zoomStack.spacing = 2
 
-        // Top-level row: [Pan pad] [sep] [Zoom] [sep] [Rotate] [sep] [Pitch]
-        let row = UIStackView(arrangedSubviews: [panPad, sep1, zoomStack, sep2, rotateStack, sep3, pitchStack])
+        // ----- Fly-through column: one big button -----
+        var flyConfig = UIButton.Configuration.tinted()
+        flyConfig.image = UIImage(systemName: "airplane.circle.fill")
+        flyConfig.title = "3D Fly"
+        flyConfig.imagePlacement = .top
+        flyConfig.imagePadding = 2
+        flyConfig.cornerStyle = .medium
+        flyConfig.baseBackgroundColor = .systemBlue
+        flyConfig.baseForegroundColor = .systemBlue
+        flyConfig.buttonSize = .small
+        let flyButton = UIButton(configuration: flyConfig, primaryAction: nil)
+        flyButton.translatesAutoresizingMaskIntoConstraints = false
+        flyButton.addTarget(self, action: #selector(startFlyThrough), for: .touchUpInside)
+        flyButton.accessibilityLabel = "Start 3D fly-through"
+
+        let flyStack = UIStackView(arrangedSubviews: [flyLabel, flyButton])
+        flyStack.translatesAutoresizingMaskIntoConstraints = false
+        flyStack.axis = .vertical
+        flyStack.alignment = .center
+        flyStack.spacing = 2
+
+        // Top-level row:
+        //   [Pan pad] [sep] [Zoom] [sep] [Rotate] [sep] [Tilt presets] [sep] [Fly-through]
+        let row = UIStackView(arrangedSubviews: [panPad, sep1, zoomStack, sep2, rotateStack, sep3, tiltStack, sep4, flyStack])
         row.translatesAutoresizingMaskIntoConstraints = false
         row.axis = .horizontal
         row.alignment = .center
@@ -342,9 +383,36 @@ final class MapViewController: UIViewController {
             sep2.heightAnchor.constraint(equalToConstant: 44),
             sep3.widthAnchor.constraint(equalToConstant: 1),
             sep3.heightAnchor.constraint(equalToConstant: 44),
+            sep4.widthAnchor.constraint(equalToConstant: 1),
+            sep4.heightAnchor.constraint(equalToConstant: 44),
 
-            pitchSlider.widthAnchor.constraint(equalToConstant: 110)
+            tiltStack.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
+            flyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            flyButton.heightAnchor.constraint(equalToConstant: 36)
         ])
+    }
+
+    private func makeTiltPresetButton(title: String, systemImage: String?, action: Selector) -> UIButton {
+        var config = UIButton.Configuration.gray()
+        if let name = systemImage {
+            config.image = UIImage(systemName: name, withConfiguration: UIImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+        }
+        config.title = title
+        config.imagePlacement = .top
+        config.imagePadding = 1
+        config.titleAlignment = .center
+        config.cornerStyle = .small
+        config.baseBackgroundColor = .systemBackground
+        config.baseForegroundColor = .systemBlue
+        var titleAttr = AttributedString(title)
+        titleAttr.font = .systemFont(ofSize: 9, weight: .semibold)
+        config.attributedTitle = titleAttr
+        config.contentInsets = NSDirectionalEdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4)
+        let button = UIButton(configuration: config, primaryAction: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: action, for: .touchUpInside)
+        button.accessibilityLabel = "Tilt \(title)"
+        return button
     }
 
     private func makeZoomRow() -> UIStackView {
@@ -408,8 +476,10 @@ final class MapViewController: UIViewController {
     // MARK: - Map gesture pass-through
 
     @objc private func handleMapGesture() {
-        // If the user starts interacting with the map, stop trying to follow them.
+        // If the user starts interacting with the map, stop trying to follow them
+        // and stop any active fly-through rotation so gestures don't fight the timer.
         didCenterOnUser = false
+        stopHeadingRotation()
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -422,12 +492,94 @@ final class MapViewController: UIViewController {
     // MARK: - Existing actions
 
     @objc private func mapTypeChanged() {
+        // The Flyover map types (satelliteFlyover / hybridFlyover) require a
+        // pitched camera to render the 3D photogrammetry models - they look
+        // the same as the flat variants when viewed top-down. Switching to a
+        // Flyover type therefore also auto-applies a 55° tilt if the user
+        // hasn't already tilted manually.
+        let flyoverTypes: [MKMapType] = [.satelliteFlyover, .hybridFlyover]
         switch mapTypeControl.selectedSegmentIndex {
         case 0: mapView.mapType = .standard
-        case 1: mapView.mapType = .hybrid
-        case 2: mapView.mapType = .satellite
+        case 1: mapView.mapType = .satellite
+        case 2: mapView.mapType = .hybrid
+        case 3: mapView.mapType = .satelliteFlyover
+        case 4: mapView.mapType = .hybridFlyover
         default: break
         }
+        // If we just switched into a Flyover mode and the camera is still
+        // top-down, tilt it so the user can actually see the 3D models.
+        if flyoverTypes.contains(mapView.mapType) && mapView.camera.pitch == 0 {
+            tiltTo(45, animated: true)
+        }
+    }
+
+    // MARK: - Tilt controls
+
+    /// Discrete tilt presets. The user can pick any of these and the camera
+    /// animates to that pitch while keeping the current center, heading, and
+    /// zoom. If the camera is too high for the requested tilt, the camera is
+    /// automatically pulled in to a sensible altitude so the 3D models are
+    /// actually visible.
+    @objc private func tiltTopDown()   { tiltTo(0,  animated: true) }
+    @objc private func tilt25()        { tiltTo(25, animated: true) }
+    @objc private func tilt45()        { tiltTo(45, animated: true) }
+    @objc private func tilt60()        { tiltTo(60, animated: true) }
+    @objc private func tiltStreet()    { tiltTo(75, animated: true) }
+
+    private func tiltTo(_ pitch: Double, animated: Bool) {
+        let camera = mapView.camera.copy() as! MKMapCamera
+        camera.pitch = CGFloat(pitch)
+        // Pick an altitude that's appropriate for the requested tilt.
+        switch pitch {
+        case 0:        break                              // top-down: keep current zoom
+        case 0..<30:   camera.altitude = max(camera.altitude, 800)
+        case 30..<55:  camera.altitude = max(min(camera.altitude, 2_000), 500)
+        case 55..<70:  camera.altitude = max(min(camera.altitude, 600), 250)
+        default:       camera.altitude = 200              // street-level
+        }
+        // For flyover map types the camera must be tilted to see 3D models -
+        // this is handled here too, so tiltTopDown() is also a useful reset.
+        mapView.setCamera(camera, animated: animated)
+    }
+
+    @objc private func startFlyThrough() {
+        // Switch to a flyover mode (so 3D models are guaranteed to render),
+        // pick a landmark, and animate a cinematic camera fly-through.
+        let landmark = CLLocationCoordinate2D(latitude: 40.7580, longitude: -73.9855) // Times Square
+        if mapView.mapType != .hybridFlyover {
+            mapView.mapType = .hybridFlyover
+            mapTypeControl.selectedSegmentIndex = 4
+        }
+        let camera = MKMapCamera()
+        camera.centerCoordinate = landmark
+        camera.altitude = 150
+        camera.pitch = 35
+        camera.heading = 0
+        mapView.setCamera(camera, animated: true)
+        // After the initial move settles, start a slow heading rotation that
+        // gives a 'flying around the landmark' feel. The user can stop it
+        // anytime by interacting with the map.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.beginHeadingRotation()
+        }
+        showInfo("Fly-through active — interact with the map to stop.")
+    }
+
+    private var headingRotationTimer: Timer?
+
+    private func beginHeadingRotation() {
+        headingRotationTimer?.invalidate()
+        headingRotationTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            let cam = self.mapView.camera.copy() as! MKMapCamera
+            cam.heading = (cam.heading + 0.6).truncatingRemainder(dividingBy: 360)
+            self.mapView.setCamera(cam, animated: false)
+        }
+    }
+
+    private func stopHeadingRotation() {
+        headingRotationTimer?.invalidate()
+        headingRotationTimer = nil
     }
 
     @objc private func recenterOnUser() {
@@ -511,9 +663,11 @@ final class MapViewController: UIViewController {
         let heading = (cam.heading.truncatingRemainder(dividingBy: 360) + 360)
             .truncatingRemainder(dividingBy: 360)
         let altitude = formatAltitude(cam.altitude)
+        let typeStr = mapTypeShortName(mapView.mapType)
+        let threeDIndicator = flyoverMapTypes.contains(mapView.mapType) ? " • 3D" : ""
         let text = String(
-            format: "H %3.0f°   P %2.0f°   Z %@",
-            heading, cam.pitch, altitude
+            format: "%@  H %3.0f°   P %2.0f°   Z %@%@",
+            typeStr, heading, cam.pitch, altitude, threeDIndicator
         )
         cameraReadoutLabel.text = text
         // Keep the slider in sync with the camera (when gestures change pitch).
@@ -522,6 +676,19 @@ final class MapViewController: UIViewController {
         let camPitch = Float(cam.pitch)
         if abs(pitchSlider.value - camPitch) > 0.5 {
             pitchSlider.value = camPitch
+        }
+    }
+
+    private let flyoverMapTypes: Set<MKMapType> = [.satelliteFlyover, .hybridFlyover]
+
+    private func mapTypeShortName(_ type: MKMapType) -> String {
+        switch type {
+        case .standard:          return "Std"
+        case .satellite:         return "Sat"
+        case .hybrid:            return "Hyb"
+        case .satelliteFlyover:  return "Sat 3D"
+        case .hybridFlyover:     return "Hyb 3D"
+        @unknown default:        return "?"
         }
     }
 
