@@ -33,6 +33,34 @@ final class MapViewController: UIViewController {
         return button
     }()
 
+    private lazy var threeDButton: UIButton = {
+        var config = UIButton.Configuration.filled()
+        config.image = UIImage(systemName: "view.3d")
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = .systemBackground
+        config.baseForegroundColor = .systemBlue
+        let button = UIButton(configuration: config, primaryAction: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: #selector(toggle3D), for: .touchUpInside)
+        button.accessibilityLabel = "Toggle 3D mode"
+        return button
+    }()
+
+    private lazy var flyToCityButton: UIButton = {
+        var config = UIButton.Configuration.tinted()
+        config.title = "Fly to NYC"
+        config.image = UIImage(systemName: "airplane")
+        config.imagePadding = 6
+        config.cornerStyle = .capsule
+        config.baseBackgroundColor = .systemBackground
+        config.baseForegroundColor = .systemBlue
+        let button = UIButton(configuration: config, primaryAction: nil)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: #selector(flyToNewYork), for: .touchUpInside)
+        button.accessibilityLabel = "Fly to New York in 3D"
+        return button
+    }()
+
     private lazy var infoLabel: UILabel = {
         let label = UILabel()
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -49,6 +77,7 @@ final class MapViewController: UIViewController {
     }()
 
     private var didCenterOnUser = false
+    private var is3DMode = false
 
     // MARK: - Lifecycle
 
@@ -59,6 +88,30 @@ final class MapViewController: UIViewController {
         setupMap()
         setupControls()
         setupLocation()
+
+        // Debug helper: launching with -flyToNYC 1 jumps straight to the 3D view
+        // so the camera tilt can be verified headlessly (e.g. via simctl).
+        // Use -flyToNYC 2 for a non-3D version (pitch=0) at the same location
+        // for an apples-to-apples comparison.
+        let args = ProcessInfo.processInfo.arguments
+        if let idx = args.firstIndex(of: "-flyToNYC"), idx + 1 < args.count {
+            let mode = args[idx + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                if mode == "2" {
+                    // Move to NYC, top-down (no 3D)
+                    let nyc = CLLocationCoordinate2D(latitude: 40.7580, longitude: -73.9855)
+                    let region = MKCoordinateRegion(
+                        center: nyc,
+                        latitudinalMeters: 1_500,
+                        longitudinalMeters: 1_500
+                    )
+                    self.mapView.setRegion(region, animated: true)
+                } else {
+                    self.flyToNewYork()
+                }
+            }
+        }
     }
 
     // MARK: - Setup
@@ -108,6 +161,8 @@ final class MapViewController: UIViewController {
 
         view.addSubview(mapTypeControl)
         view.addSubview(recenterButton)
+        view.addSubview(threeDButton)
+        view.addSubview(flyToCityButton)
         view.addSubview(infoLabel)
 
         NSLayoutConstraint.activate([
@@ -120,7 +175,16 @@ final class MapViewController: UIViewController {
             recenterButton.widthAnchor.constraint(equalToConstant: 50),
             recenterButton.heightAnchor.constraint(equalToConstant: 50),
 
-            infoLabel.bottomAnchor.constraint(equalTo: recenterButton.topAnchor, constant: -12),
+            threeDButton.bottomAnchor.constraint(equalTo: recenterButton.topAnchor, constant: -12),
+            threeDButton.trailingAnchor.constraint(equalTo: recenterButton.trailingAnchor),
+            threeDButton.widthAnchor.constraint(equalToConstant: 50),
+            threeDButton.heightAnchor.constraint(equalToConstant: 50),
+
+            flyToCityButton.bottomAnchor.constraint(equalTo: threeDButton.topAnchor, constant: -12),
+            flyToCityButton.trailingAnchor.constraint(equalTo: threeDButton.trailingAnchor),
+            flyToCityButton.heightAnchor.constraint(equalToConstant: 50),
+
+            infoLabel.bottomAnchor.constraint(equalTo: flyToCityButton.topAnchor, constant: -12),
             infoLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             infoLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 16),
             infoLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -16)
@@ -169,6 +233,42 @@ final class MapViewController: UIViewController {
             longitudinalMeters: 1_000
         )
         mapView.setRegion(region, animated: true)
+    }
+
+    // MARK: - 3D Mode
+
+    @objc private func toggle3D() {
+        is3DMode.toggle()
+        applyCameraPitch(animated: true)
+    }
+
+    @objc private func flyToNewYork() {
+        // A real 3D city fly-over: tilt the camera + rotate heading + zoom in.
+        let nyc = CLLocationCoordinate2D(latitude: 40.7580, longitude: -73.9855) // Times Square
+        is3DMode = true
+        let camera = MKMapCamera()
+        camera.centerCoordinate = nyc
+        camera.altitude = 350              // meters above ground — close-in city view
+        camera.pitch = 55                  // 0 = top-down, 90 = horizontal. 55° gives a 3D look.
+        camera.heading = 30                // rotate so the skyline is angled, not flat
+        mapView.setCamera(camera, animated: true)
+    }
+
+    /// Applies the current 3D-mode state to the existing map camera, preserving
+    /// the user's center coordinate, heading, and altitude.
+    private func applyCameraPitch(animated: Bool) {
+        let camera = mapView.camera.copy() as! MKMapCamera
+        if is3DMode {
+            camera.pitch = 55
+            // Heading 0 means the camera is facing true north. Keep whatever
+            // the user has rotated to so we don't snap them back.
+            if camera.altitude > 5_000 {
+                camera.altitude = 1_500    // zoom in a bit so 3D is visible
+            }
+        } else {
+            camera.pitch = 0
+        }
+        mapView.setCamera(camera, animated: animated)
     }
 
     // MARK: - Helpers
